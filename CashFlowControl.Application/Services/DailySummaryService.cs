@@ -18,21 +18,59 @@ namespace CashFlowControl.Application.Services
 
         public async Task<DailySummary> GetDailySummary(DateTime date)
         {
-            var transactions = await _context.Transactions
-                .Where(t => t.Date.Date == date.Date)
-                .ToListAsync();
+            // Check if we have a cached summary for the previous day (D-1)
+            var previousDay = date.Date.AddDays(-1);
+            var cachedSummary = await _context.DailySummaries
+                .FirstOrDefaultAsync(ds => ds.Date == previousDay);
 
-            var totalCredits = transactions.Where(t => t.IsCredit).Sum(t => t.Amount);
-            var totalDebits = transactions.Where(t => !t.IsCredit).Sum(t => t.Amount);
-            var balance = totalCredits - totalDebits;
-
-            return new DailySummary
+            if (cachedSummary != null)
             {
-                Date = date,
-                TotalCredits = totalCredits,
-                TotalDebits = totalDebits,
-                Balance = balance
-            };
+                // If we have a cached summary, use it as a starting point
+                var todayTransactions = await _context.Transactions
+                    .Where(t => t.Date.Date == date.Date)
+                    .ToListAsync();
+
+                var todayCredits = todayTransactions.Where(t => t.IsCredit).Sum(t => t.Amount);
+                var todayDebits = todayTransactions.Where(t => !t.IsCredit).Sum(t => t.Amount);
+
+                return new DailySummary
+                {
+                    Date = date,
+                    TotalCredits = cachedSummary.TotalCredits + todayCredits,
+                    TotalDebits = cachedSummary.TotalDebits + todayDebits,
+                    Balance = cachedSummary.Balance + todayCredits - todayDebits
+                };
+            }
+            else
+            {
+                // If no cached summary, calculate from scratch
+                var transactions = await _context.Transactions
+                    .Where(t => t.Date.Date <= date.Date)
+                    .ToListAsync();
+
+                var totalCredits = transactions.Where(t => t.IsCredit).Sum(t => t.Amount);
+                var totalDebits = transactions.Where(t => !t.IsCredit).Sum(t => t.Amount);
+                var balance = totalCredits - totalDebits;
+
+                var summary = new DailySummary
+                {
+                    Date = date,
+                    TotalCredits = totalCredits,
+                    TotalDebits = totalDebits,
+                    Balance = balance
+                };
+
+                // Cache the summary for the current day
+                await CacheDailySummary(summary);
+
+                return summary;
+            }
+        }
+
+        private async Task CacheDailySummary(DailySummary summary)
+        {
+            _context.DailySummaries.Add(summary);
+            await _context.SaveChangesAsync();
         }
     }
 }
