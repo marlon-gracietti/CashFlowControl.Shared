@@ -32,7 +32,7 @@ jobs:
 
     - name: Generate version number
       id: version
-      run: echo "VERSION=$(date +'%Y.%m.%d.%H%M%S')" >> $GITHUB_ENV
+      run: echo "VERSION=$(date +'%Y.%m.%d.%H%M')" >> $GITHUB_ENV
 
     - name: Update version in .csproj
       run: |
