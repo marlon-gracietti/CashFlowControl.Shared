@@ -30,10 +30,21 @@ jobs:
     - name: Run tests
       run: dotnet test CashFlowControl.Shared.sln --configuration Release --no-build --verbosity normal
 
+    - name: Generate version number
+      id: version
+      run: echo "VERSION=$(date +%Y%m%d.%H%M%S)-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+    - name: Update version in .csproj
+      run: |
+        VERSION=${{ env.VERSION }}
+        for file in $(find . -name '*.csproj'); do
+          sed -i "s/<Version>.*<\/Version>/<Version>$VERSION<\/Version>/" $file
+        done
+
     - name: Pack NuGet packages
       run: dotnet pack CashFlowControl.Shared.sln --configuration Release --output ./artifacts
 
     - name: Publish NuGet packages
       env:
         NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-      run: dotnet nuget push ./artifacts/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json
+      run: dotnet nuget push ./artifacts/*.nupkg -k ${{ secrets.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
