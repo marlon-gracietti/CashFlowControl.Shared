@@ -1,4 +1,4 @@
-﻿using CashFlowControl.Core.Entities;
+using CashFlowControl.Core.Entities;
 using CashFlowControl.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -18,10 +18,42 @@ namespace CashFlowControl.Application.Services
 
         public async Task<DailySummary> GetDailySummary(DateTime date)
         {
+<<<<<<< HEAD
+            // Check if we're asking for the summary of the previous day (D-1)
+            var previousDay = DateTime.Today.AddDays(-1);
+
+            if (date.Date == previousDay)
+            {
+                // Try to get the cached summary for the previous day
+                var cachedSummary = await _context.DailySummaries
+                    .FirstOrDefaultAsync(ds => ds.Date == previousDay);
+
+                if (cachedSummary != null)
+                {
+                    return cachedSummary;
+                }
+
+                // If no cached summary, calculate from scratch
+                return await CalculateAndCacheDailySummary(date);
+            }
+            else
+            {
+                // For any day other than D-1, always calculate (do not cache)
+                return await CalculateDailySummary(date);
+            }
+        }
+
+        private async Task<DailySummary> CalculateDailySummary(DateTime date)
+        {
+            var transactions = await _context.Transactions
+                .Where(t => t.Date.Date <= date.Date)
+                .ToListAsync();
+=======
             // Check if we have a cached summary for the previous day (D-1)
             var previousDay = date.Date.AddDays(-1);
             var cachedSummary = await _context.DailySummaries
                 .FirstOrDefaultAsync(ds => ds.Date == previousDay);
+>>>>>>> 9d1ab90e6ec3aca64a990be0e41b98e629779e8c
 
             if (cachedSummary != null)
             {
@@ -65,6 +97,22 @@ namespace CashFlowControl.Application.Services
 
                 return summary;
             }
+        }
+
+        private async Task CacheDailySummary(DailySummary summary)
+        {
+            _context.DailySummaries.Add(summary);
+            await _context.SaveChangesAsync();
+        }
+
+        private async Task<DailySummary> CalculateAndCacheDailySummary(DateTime date)
+        {
+            var summary = await CalculateDailySummary(date);
+
+            // Cache the summary for the current day (D-1)
+            await CacheDailySummary(summary);
+
+            return summary;
         }
 
         private async Task CacheDailySummary(DailySummary summary)
